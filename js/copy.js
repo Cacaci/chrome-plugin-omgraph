@@ -1,9 +1,15 @@
-document.addEventListener('copy', async function (event) {
-  event.preventDefault()
-  const textPlain = ''
-  const textHTML = ''
-  let textURL = ''
+let hotkeys = []
+function guid(rawid = '') {
+  rawid = rawid ? rawid : 'xyxxxxxyx'
+  let formatter = rawid + '-xxxyxxx-xxxxxxxx'
+  return formatter.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0,
+      v = c == 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
 
+const generateFragmentURL = async () => {
   const { generateFragment } = await import('https://unpkg.com/text-fragments-polyfill/dist/fragment-generation-utils.js');
   const result = generateFragment(window.getSelection());
   if (result.status === 0) {
@@ -14,39 +20,48 @@ document.addEventListener('copy', async function (event) {
     const textStart = encodeURIComponent(fragment.textStart);
     const textEnd = fragment.textEnd ? ',' + encodeURIComponent(fragment.textEnd) : '';
     url = url + '#:~:text=' + prefix + textStart + textEnd + suffix;
-    textURL = url
+    return url
   }
-  event.clipboardData.setData('text/plain', textPlain)
-  event.clipboardData.setData('text/html', textHTML)
-  event.clipboardData.setData('application/x-editor-js', '111')
+}
+
+document.body.addEventListener('keydown', function (event) {
+  // console.log('keydown', event)
+  hotkeys.push(event.key)
+  if (hotkeys.length > 3) {
+    hotkeys.shift()
+  }
+}, false)
+
+document.body.addEventListener('keyup', async function (event) {
+  // TODO: 暂时先不根据 uc 判断平台
+  // if (hotkeys.toString() === 'Control,Shift,C') {}
+  if ((event.metaKey && event.shiftKey && event.keyCode === 67) || (event.ctrlKey && event.shiftKey && event.keyCode === 67)) {
+    // console.log('keyup', event)
+    event.preventDefault();
+    const copyText = window.getSelection().toString();
+    const pageUrl = window.location.href
+    if (!copyText) return
+    generateFragmentURL().then(async fragmentUrl => {
+      console.log('url', fragmentUrl)
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': new Blob([copyText], { type: 'text/plain' }),
+          'text/html': new Blob([`
+              <span
+                id="${guid()}"
+                data-target-title="${document.title}" 
+                data-target-type="web"
+                data-target-url="${fragmentUrl}"
+                data-target-origin-url="${pageUrl}"
+                data-target-origin-text="${copyText}">${copyText}</span>
+              `], { type: 'text/html' })
+        })
+      ]);
+    })
+  }
 })
 
-// test
-document.addEventListener('paste', function (event) {
-  event.preventDefault()
-  console.log(event.clipboardData.getData('text/plain'))
+
+document.body.addEventListener('paste', function (event) {
   console.log(event.clipboardData.getData('text/html'))
-  console.log(event.clipboardData.getData('application/x-editor-js'))
 })
-
-
-// var pageUrl = window.location.href
-// var encodedUrl = encodeURI(pageUrl.split('#')[0])
-// var copyText = window.getSelection().toString();
-// encodedUrl += '#:~:text=' + copyText
-
-// var cliboardTextData = new Blob([url], { type: 'application/omgragh' })
-// console.log('type', cliboardTextData.type)
-// await navigator.clipboard.write([
-//   new ClipboardItem({
-//     [cliboardTextData.type]: cliboardTextData
-//     // 'text/plain': JSON.stringify({
-//     //   type: "web",
-//     //   url: url
-//     // })
-//   }, { raw: true })
-// ]).then(() => {
-//   console.info('write successfully')
-// }).catch(error => {
-//   console.error(error)
-// });
